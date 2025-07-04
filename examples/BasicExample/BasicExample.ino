@@ -3,7 +3,7 @@
 #include <WiFiSetting.h>
 
 WebServer server(80);
-WiFiSetting wifiSetting("ESP32_Setup", "12345678", "esp32", server);
+WiFiSetting wifiSetting("ESP32_Setup", "12345678", server);
 
 void setup()
 {

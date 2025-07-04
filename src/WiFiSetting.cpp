@@ -105,7 +105,7 @@ void WiFiSetting::handleRoot()
       .container { background: white; padding: 20px 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; width: 100%; }
       h1 { text-align: center; color: #333; }
       label { font-weight: bold; }
-      select, input[type='password'], input[type='submit'] { width: 100%; padding: 10px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 5px; }
+      select, input[type='password'], input[type='submit'] { width: 100%; height: 40px; padding: 10px; margin: 8px 0 16px 0; border: 1px solid #ccc; border-radius: 5px;   box-sizing: border-box; }
       input[type='submit'] { background-color: #007bff; color: white; border: none; cursor: pointer; }
       input[type='submit']:hover { background-color: #0056b3; }
     </style></head><body>

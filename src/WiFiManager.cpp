@@ -55,7 +55,7 @@ bool WiFiManager::connectIfStored()
 /**
  * @brief Bật chế độ Access Point (AP) và tạo portal cấu hình WiFi qua web.
  *
- * Giao diện web: http://192.168.4.1 (hoặc theo IP của AP ESP32)
+ * Giao diện web: http://192.168.4.1 hoặc mDNS.local đã set trong class (hoặc theo IP của AP ESP32)
  */
 void WiFiManager::startAPMode()
 {

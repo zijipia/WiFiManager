@@ -49,26 +49,7 @@ bool WiFiManager::connectIfStored()
             retry++;
         }
     }
-    if (WiFi.status() == WL_CONNECTED)
-    {
-        Serial.println();
-        Serial.print("✅ Đã kết nối WiFi. IP: ");
-        Serial.println(WiFi.localIP());
-
-        if (!MDNS.begin(mdns_name))
-        {
-            Serial.println("❌ mDNS khởi tạo thất bại");
-        }
-        else
-        {
-            Serial.print("✅ mDNS chạy tại: http://");
-            Serial.print(mdns_name);
-            Serial.println(".local");
-        }
-
-        return true;
-    }
-    return false;
+    return WiFi.status() == WL_CONNECTED;
 }
 
 /**
@@ -83,6 +64,17 @@ void WiFiManager::startAPMode()
     WiFi.mode(WIFI_AP_STA);
     delay(100);
 
+    if (!MDNS.begin(mdns_name))
+    {
+        Serial.println("❌ mDNS khởi tạo thất bại");
+    }
+    else
+    {
+        Serial.print("✅ mDNS chạy tại: http://");
+        Serial.print(mdns_name);
+        Serial.println(".local");
+    }
+
     WiFi.softAP(ap_ssid, ap_password);
     delay(500);
     server.on("/", HTTP_GET, std::bind(&WiFiManager::handleRoot, this));
@@ -93,6 +85,8 @@ void WiFiManager::startAPMode()
     server.onNotFound(std::bind(&WiFiManager::handleRoot, this));                           // tất cả các route khác
 
     server.begin();
+    MDNS.addService("http", "tcp", 80);
+
     while (true)
     {
         server.handleClient();

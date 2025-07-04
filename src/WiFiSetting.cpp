@@ -1,5 +1,5 @@
-#include "WiFiManager.h"
-#include <ESPmDNS.h>
+#include "WiFiSetting.h"
+#include <DNSServer.h>
 
 #define EEPROM_SIZE 96
 #define SSID_ADDR 0
@@ -8,20 +8,19 @@
 #define MAX_PASS 64
 
 /**
- * @brief Tạo một WiFiManager với tên AP, mật khẩu AP, mDNS name và WebServer.
+ * @brief Tạo một WiFiSetting với tên AP, mật khẩu AP, mDNS name và WebServer.
  *
  * @param apSSID Tên SSID khi tạo chế độ AP.
  * @param apPassword Mật khẩu AP mode.
- * @param Ns Tên mDNS (ví dụ: "esp32" sẽ tạo http://esp32.local).
  * @param serverRef Tham chiếu đến WebServer đang dùng.
  */
-WiFiManager::WiFiManager(const char *apSSID, const char *apPassword, const char *Ns, WebServer &serverRef)
-    : ap_ssid(apSSID), ap_password(apPassword), mdns_name(Ns), server(serverRef) {}
+WiFiSetting::WiFiSetting(const char *apSSID, const char *apPassword, WebServer &serverRef)
+    : ap_ssid(apSSID), ap_password(apPassword), server(serverRef) {}
 
 /**
  * @brief Khởi tạo EEPROM, nên gọi ở trong `setup()`.
  */
-void WiFiManager::begin()
+void WiFiSetting::begin()
 {
     EEPROM.begin(EEPROM_SIZE);
 }
@@ -34,12 +33,13 @@ void WiFiManager::begin()
  * @return true Nếu kết nối thành công
  * @return false Nếu không kết nối được WiFi
  */
-bool WiFiManager::connectIfStored()
+bool WiFiSetting::connectIfStored()
 {
     String ssid, pass;
     readWiFiFromEEPROM(ssid, pass);
     if (ssid.length() > 0)
     {
+        WiFi.mode(WIFI_STA);
         WiFi.begin(ssid.c_str(), pass.c_str());
         int retry = 0;
         while (WiFi.status() != WL_CONNECTED && retry < 20)
@@ -57,36 +57,27 @@ bool WiFiManager::connectIfStored()
  *
  * Giao diện web: http://192.168.4.1 hoặc mDNS.local đã set trong class (hoặc theo IP của AP ESP32)
  */
-void WiFiManager::startAPMode()
+void WiFiSetting::startAPMode()
 {
-    WiFi.disconnect();
+    WiFi.disconnect(true, true);
     delay(100);
     WiFi.mode(WIFI_AP_STA);
     delay(100);
 
-    if (!MDNS.begin(mdns_name))
-    {
-        Serial.println("❌ mDNS khởi tạo thất bại");
-    }
-    else
-    {
-        Serial.print("✅ mDNS chạy tại: http://");
-        Serial.print(mdns_name);
-        Serial.println(".local");
-    }
-
     WiFi.softAP(ap_ssid, ap_password);
+
+    DNSServer dnsServer;
+    dnsServer.start(53, "*", WiFi.softAPIP());
+
     delay(500);
-    server.on("/", HTTP_GET, std::bind(&WiFiManager::handleRoot, this));
-    server.on("/setup", HTTP_POST, std::bind(&WiFiManager::handleSetup, this));
-    server.on("/generate_204", HTTP_GET, std::bind(&WiFiManager::handleRoot, this));        // Android
-    server.on("/hotspot-detect.html", HTTP_GET, std::bind(&WiFiManager::handleRoot, this)); // Apple
-    server.on("/fwlink", HTTP_GET, std::bind(&WiFiManager::handleRoot, this));              // Windows
-    server.onNotFound(std::bind(&WiFiManager::handleRoot, this));                           // tất cả các route khác
+    server.on("/", HTTP_GET, std::bind(&WiFiSetting::handleRoot, this));
+    server.on("/setup", HTTP_POST, std::bind(&WiFiSetting::handleSetup, this));
+    server.on("/generate_204", HTTP_GET, std::bind(&WiFiSetting::handleRoot, this));        // Android
+    server.on("/hotspot-detect.html", HTTP_GET, std::bind(&WiFiSetting::handleRoot, this)); // Apple
+    server.on("/fwlink", HTTP_GET, std::bind(&WiFiSetting::handleRoot, this));              // Windows
+    server.onNotFound(std::bind(&WiFiSetting::handleRoot, this));                           // tất cả các route khác
 
     server.begin();
-    MDNS.addService("http", "tcp", 80);
-
     while (true)
     {
         server.handleClient();
@@ -97,7 +88,7 @@ void WiFiManager::startAPMode()
 /**
  * @brief Gọi trong vòng lặp `loop()` để xử lý các request HTTP khi đã kết nối WiFi.
  */
-void WiFiManager::handleClient()
+void WiFiSetting::handleClient()
 {
     server.handleClient();
 }
@@ -105,7 +96,7 @@ void WiFiManager::handleClient()
 /**
  * @brief Trang giao diện chính (GET /), trả về HTML chọn SSID và nhập mật khẩu.
  */
-void WiFiManager::handleRoot()
+void WiFiSetting::handleRoot()
 {
     String html = R"rawliteral(
     <!DOCTYPE html><html><head><meta charset="UTF-8"><title>WiFi Setup</title>
@@ -140,7 +131,7 @@ void WiFiManager::handleRoot()
 /**
  * @brief Xử lý POST từ form cấu hình WiFi, lưu vào EEPROM và khởi động lại.
  */
-void WiFiManager::handleSetup()
+void WiFiSetting::handleSetup()
 {
     if (server.hasArg("ssid") && server.hasArg("password"))
     {
@@ -164,30 +155,16 @@ void WiFiManager::handleSetup()
  *
  * @return Chuỗi HTML danh sách các mạng WiFi.
  */
-String WiFiManager::generateWiFiOptions()
+String WiFiSetting::generateWiFiOptions()
 {
+
     String options;
-
-    int scanStatus = WiFi.scanComplete();
-    if (scanStatus == -2)
+    int n = WiFi.scanNetworks();
+    for (int i = 0; i < n; ++i)
     {
-        WiFi.scanNetworks(true);
-        options += "<option disabled>Đang quét mạng WiFi...</option>";
+        options += "<option value='" + WiFi.SSID(i) + "'>";
+        options += WiFi.SSID(i) + " (" + String(WiFi.RSSI(i)) + " dBm)</option>";
     }
-    else if (scanStatus >= 0)
-    {
-        for (int i = 0; i < scanStatus; ++i)
-        {
-            options += "<option value='" + WiFi.SSID(i) + "'>";
-            options += WiFi.SSID(i) + " (" + String(WiFi.RSSI(i)) + " dBm)</option>";
-        }
-        WiFi.scanDelete();
-    }
-    else
-    {
-        options += "<option disabled>Đang quét mạng WiFi...</option>";
-    }
-
     return options;
 }
 
@@ -197,7 +174,7 @@ String WiFiManager::generateWiFiOptions()
  * @param ssid Tên WiFi.
  * @param pass Mật khẩu WiFi.
  */
-void WiFiManager::saveWiFiToEEPROM(const String &ssid, const String &pass)
+void WiFiSetting::saveWiFiToEEPROM(const String &ssid, const String &pass)
 {
     EEPROM.writeString(SSID_ADDR, ssid);
     EEPROM.writeString(PASS_ADDR, pass);
@@ -210,7 +187,7 @@ void WiFiManager::saveWiFiToEEPROM(const String &ssid, const String &pass)
  * @param ssid Tham chiếu để nhận SSID.
  * @param pass Tham chiếu để nhận mật khẩu.
  */
-void WiFiManager::readWiFiFromEEPROM(String &ssid, String &pass)
+void WiFiSetting::readWiFiFromEEPROM(String &ssid, String &pass)
 {
     ssid = EEPROM.readString(SSID_ADDR);
     pass = EEPROM.readString(PASS_ADDR);

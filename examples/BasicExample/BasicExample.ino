@@ -1,18 +1,18 @@
 #include <WiFi.h>
 #include <WebServer.h>
-#include <WiFiManager.h>
+#include <WiFiSetting.h>
 
 WebServer server(80);
-WiFiManager wifiManager("ESP32_Setup", "12345678", "esp32", server);
+WiFiSetting wifiSetting("ESP32_Setup", "12345678", "esp32", server);
 
 void setup()
 {
   Serial.begin(115200);
-  wifiManager.begin();
-  if (!wifiManager.connectIfStored())
+  wifiSetting.begin();
+  if (!wifiSetting.connectIfStored())
   {
     Serial.println("Không kết nối được WiFi. Chuyển sang AP mode");
-    wifiManager.startAPMode();
+    wifiSetting.startAPMode();
   }
   Serial.print("Đã kết nối WiFi: ");
   Serial.println(WiFi.localIP());
@@ -20,5 +20,5 @@ void setup()
 
 void loop()
 {
-  wifiManager.handleClient();
+  wifiSetting.handleClient();
 }

@@ -5,10 +5,10 @@
 #include <WebServer.h>
 #include <EEPROM.h>
 
-class WiFiManager
+class WiFiSetting
 {
 public:
-    WiFiManager(const char *apSSID, const char *apPassword, const char *Ns, WebServer &serverRef);
+    WiFiSetting(const char *apSSID, const char *apPassword, WebServer &serverRef);
 
     void begin();
     bool connectIfStored();
@@ -19,7 +19,6 @@ private:
     const char *ap_ssid;
     const char *ap_password;
     WebServer &server;
-    const char *mdns_name;
     void handleRoot();
     void handleSetup();
     String generateWiFiOptions();
